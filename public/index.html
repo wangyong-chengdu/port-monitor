@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>端口连通性监控系统</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-network-wired"></i> 端口连通性监控系统</h1>
+            <!-- 用户信息将通过JavaScript动态添加 -->
+            <div class="header-actions">
+                <button id="addTaskBtn" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> 新建任务
+                </button>
+                <button id="feishuConfigBtn" class="btn btn-secondary">
+                    <i class="fas fa-cog"></i> 飞书配置
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <!-- 任务列表 -->
+            <div class="task-list">
+                <div class="section-header">
+                    <h2>监控任务列表</h2>
+                    <div class="stats">
+                        <span class="stat-item">
+                            <i class="fas fa-tasks"></i>
+                            总任务: <span id="totalTasks">0</span>
+                        </span>
+                        <span class="stat-item">
+                            <i class="fas fa-play-circle"></i>
+                            运行中: <span id="runningTasks">0</span>
+                        </span>
+                    </div>
+                </div>
+                
+                <div id="taskContainer" class="task-container">
+                    <!-- 任务卡片将在这里动态生成 -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 新建/编辑任务模态框 -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">新建监控任务</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="taskForm">
+                <div class="form-group">
+                    <label for="taskName">任务名称:</label>
+                    <input type="text" id="taskName" name="name" required placeholder="请输入任务名称">
+                </div>
+                
+                <div class="form-group">
+                    <label for="hostname">域名/IP:</label>
+                    <input type="text" id="hostname" name="hostname" required placeholder="例如: family3.cozer.cn">
+                </div>
+                
+                <div class="form-group">
+                    <label for="port">端口:</label>
+                    <input type="number" id="port" name="port" required min="1" max="65535" placeholder="例如: 5255">
+                </div>
+                
+                <div class="form-group">
+                    <label for="intervalValue">检测间隔:</label>
+                    <div class="interval-input">
+                        <input type="number" id="intervalValue" name="interval_value" required min="1" placeholder="数值">
+                        <select id="intervalUnit" name="interval_unit" required>
+                            <option value="seconds">秒</option>
+                            <option value="minutes" selected>分钟</option>
+                            <option value="hours">小时</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 飞书配置模态框 -->
+    <div id="feishuModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>飞书报警配置</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="feishuForm">
+                <div class="form-group">
+                    <label for="webhookUrl">Webhook URL:</label>
+                    <input type="url" id="webhookUrl" name="webhook_url" required 
+                           placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">
+                    <small class="form-help">
+                        请在飞书群聊中添加机器人，获取Webhook URL
+                    </small>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="feishuCancelBtn">取消</button>
+                    <button type="button" class="btn btn-info" id="testFeishuBtn">
+                        <i class="fas fa-paper-plane"></i> 测试发送
+                    </button>
+                    <button type="submit" class="btn btn-primary">保存配置</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 日志查看模态框 -->
+    <div id="logsModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="logsModalTitle">检测日志</h3>
+                <div class="logs-header-actions">
+                    <span class="auto-refresh-indicator">
+                        <i class="fas fa-sync-alt"></i>
+                        <small>每5秒自动刷新</small>
+                    </span>
+                    <span class="close">&times;</span>
+                </div>
+            </div>
+            <div class="logs-container">
+                <div id="logsContent">
+                    <!-- 日志内容将在这里动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <span>处理中...</span>
+    </div>
+
+    <!-- 通知容器 -->
+    <div id="notifications" class="notifications"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

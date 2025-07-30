@@ -147,6 +147,51 @@ function checkPortConnectivity(hostname, port, timeout = 5000) {
     });
 }
 
+// 使用指数退避算法进行重试的端口连接检测
+async function checkPortConnectivityWithRetry(hostname, port, timeout = 5000, maxRetries = 3) {
+    let lastError = null;
+    let totalResponseTime = 0;
+    let actualAttempts = 0;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        actualAttempts = attempt + 1;
+        
+        // 如果不是第一次尝试，则等待退避时间
+        if (attempt > 0) {
+            const backoffTime = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // 最大等待10秒
+            console.log(`端口检测重试 ${attempt}/${maxRetries} - ${hostname}:${port}，等待 ${backoffTime}ms`);
+            await new Promise(resolve => setTimeout(resolve, backoffTime));
+        }
+        
+        const result = await checkPortConnectivity(hostname, port, timeout);
+        
+        if (result.success) {
+            return {
+                success: true,
+                responseTime: result.responseTime,
+                attempts: actualAttempts,
+                totalTime: totalResponseTime + result.responseTime
+            };
+        }
+        
+        lastError = result.error;
+        totalResponseTime += timeout; // 累加超时时间
+        
+        // 只有在连接超时的情况下才进行重试，其他错误直接返回
+        if (result.error !== 'Connection timeout') {
+            console.log(`非超时错误，停止重试: ${result.error}`);
+            break;
+        }
+    }
+    
+    return {
+        success: false,
+        error: lastError,
+        attempts: actualAttempts,
+        totalTime: totalResponseTime
+    };
+}
+
 // 发送飞书报警
 async function sendFeishuAlert(taskName, hostname, port, error) {
     try {
@@ -208,14 +253,20 @@ async function sendFeishuAlert(taskName, hostname, port, error) {
 
 // 执行单次检测
 async function performCheck(task) {
-    const result = await checkPortConnectivity(task.hostname, task.port);
+    const result = await checkPortConnectivityWithRetry(task.hostname, task.port);
+    
+    // 构建错误消息，包含重试信息
+    let errorMessage = result.error || null;
+    if (!result.success && result.attempts > 1) {
+        errorMessage = `${result.error} (重试 ${result.attempts - 1} 次后失败)`;
+    }
     
     // 记录日志
     const logData = {
         task_id: task.id,
         status: result.success ? 'success' : 'failed',
         response_time: result.responseTime || null,
-        error_message: result.error || null,
+        error_message: errorMessage,
         checked_at: getLocalDateTime()
     };
     
@@ -224,12 +275,14 @@ async function performCheck(task) {
         [logData.task_id, logData.status, logData.response_time, logData.error_message, logData.checked_at]
     );
     
-    // 如果检测失败，发送报警
+    // 只有在所有重试都失败后才发送报警
     if (!result.success) {
-        await sendFeishuAlert(task.name, task.hostname, task.port, result.error);
+        await sendFeishuAlert(task.name, task.hostname, task.port, errorMessage);
     }
     
-    console.log(`检测完成 - ${task.name} (${task.hostname}:${task.port}): ${result.success ? '成功' : '失败'}`);
+    const statusText = result.success ? '成功' : '失败';
+    const attemptInfo = result.attempts > 1 ? ` (尝试 ${result.attempts} 次)` : '';
+    console.log(`检测完成 - ${task.name} (${task.hostname}:${task.port}): ${statusText}${attemptInfo}`);
 }
 
 // 启动定时任务

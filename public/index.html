@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>端口连通性监控系统</title>
+    <title>监控和运维系统</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1><i class="fas fa-network-wired"></i> 端口连通性监控系统</h1>
+            <h1><i class="fas fa-network-wired"></i> 监控和运维系统</h1>
             <!-- 用户信息将通过JavaScript动态添加 -->
             <div class="header-actions">
                 <button id="addTaskBtn" class="btn btn-primary">
@@ -60,13 +60,45 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="hostname">域名/IP:</label>
-                    <input type="text" id="hostname" name="hostname" required placeholder="例如: family3.cozer.cn">
+                    <label for="taskType">任务类型:</label>
+                    <select id="taskType" name="task_type" required>
+                        <option value="port">端口监控</option>
+                        <option value="script">脚本执行</option>
+                    </select>
                 </div>
                 
                 <div class="form-group">
-                    <label for="port">端口:</label>
-                    <input type="number" id="port" name="port" required min="1" max="65535" placeholder="例如: 5255">
+                    <label for="hostname">服务器地址:</label>
+                    <input type="text" id="hostname" name="hostname" required placeholder="例如: 192.168.1.100 或 example.com">
+                </div>
+                
+                <!-- 端口监控相关字段 -->
+                <div id="portFields" class="task-type-fields">
+                    <div class="form-group">
+                        <label for="port">端口:</label>
+                        <input type="number" id="port" name="port" min="1" max="65535" placeholder="例如: 5255">
+                    </div>
+                </div>
+                
+                <!-- 脚本执行相关字段 -->
+                <div id="scriptFields" class="task-type-fields" style="display: none;">
+                    <div class="form-group">
+                        <label for="username">用户名:</label>
+                        <input type="text" id="username" name="username" placeholder="SSH登录用户名">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">密码:</label>
+                        <input type="password" id="password" name="password" placeholder="SSH登录密码">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="scriptPath">脚本路径:</label>
+                        <input type="text" id="scriptPath" name="script_path" placeholder="例如: ~/check_mount.sh 或 /usr/local/bin/monitor.sh">
+                        <small class="form-help">
+                            请输入要执行的脚本完整路径，支持相对路径（相对于用户家目录）
+                        </small>
+                    </div>
                 </div>
                 
                 <div class="form-group">

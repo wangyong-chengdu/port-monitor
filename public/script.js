@@ -117,6 +117,11 @@ class PortMonitor {
         document.getElementById('testFeishuBtn').addEventListener('click', () => {
             this.testFeishu();
         });
+
+        // 任务类型切换
+        document.getElementById('taskType').addEventListener('change', (e) => {
+            this.toggleTaskTypeFields(e.target.value);
+        });
     }
 
     async loadTasks() {
@@ -174,6 +179,16 @@ class PortMonitor {
         const statusClass = task.status === 'running' ? 'status-running' : 'status-stopped';
         const statusText = task.status === 'running' ? '运行中' : '已停止';
         const intervalText = this.formatInterval(task.interval_value, task.interval_unit);
+        const taskTypeText = task.task_type === 'script' ? '脚本执行' : '端口监控';
+        const taskTypeIcon = task.task_type === 'script' ? 'fas fa-terminal' : 'fas fa-network-wired';
+        
+        // 根据任务类型显示不同的目标信息
+        let targetInfo = '';
+        if (task.task_type === 'script') {
+            targetInfo = `${task.hostname} (${task.username}@${task.script_path})`;
+        } else {
+            targetInfo = `${task.hostname}:${task.port}`;
+        }
         
         return `
             <div class="task-card" data-task-id="${task.id}">
@@ -186,8 +201,12 @@ class PortMonitor {
                 
                 <div class="task-info">
                     <div class="task-info-item">
+                        <i class="${taskTypeIcon}"></i>
+                        <span>${taskTypeText}</span>
+                    </div>
+                    <div class="task-info-item">
                         <i class="fas fa-server"></i>
-                        <span>${task.hostname}:${task.port}</span>
+                        <span>${targetInfo}</span>
                     </div>
                     <div class="task-info-item">
                         <i class="fas fa-clock"></i>
@@ -277,7 +296,32 @@ class PortMonitor {
             'minutes': '分钟',
             'hours': '小时'
         };
-        return `${value} ${unitMap[unit]}`;
+        return `${value} ${unitMap[unit] || unit}`;
+    }
+
+    toggleTaskTypeFields(taskType) {
+        const portFields = document.getElementById('portFields');
+        const scriptFields = document.getElementById('scriptFields');
+        const portInput = document.getElementById('port');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const scriptPathInput = document.getElementById('scriptPath');
+        
+        if (taskType === 'port') {
+            portFields.style.display = 'block';
+            scriptFields.style.display = 'none';
+            portInput.required = true;
+            usernameInput.required = false;
+            passwordInput.required = false;
+            scriptPathInput.required = false;
+        } else if (taskType === 'script') {
+            portFields.style.display = 'none';
+            scriptFields.style.display = 'block';
+            portInput.required = false;
+            usernameInput.required = true;
+            passwordInput.required = true;
+            scriptPathInput.required = true;
+        }
     }
 
     updateStats() {
@@ -296,15 +340,25 @@ class PortMonitor {
         if (task) {
             title.textContent = '编辑监控任务';
             document.getElementById('taskName').value = task.name;
+            document.getElementById('taskType').value = task.task_type || 'port';
             document.getElementById('hostname').value = task.hostname;
-            document.getElementById('port').value = task.port;
+            document.getElementById('port').value = task.port || '';
+            document.getElementById('username').value = task.username || '';
+            document.getElementById('password').value = task.password || '';
+            document.getElementById('scriptPath').value = task.script_path || '';
             document.getElementById('intervalValue').value = task.interval_value;
             document.getElementById('intervalUnit').value = task.interval_unit;
             this.currentEditingTask = task;
+            
+            // 根据任务类型显示相应字段
+            this.toggleTaskTypeFields(task.task_type || 'port');
         } else {
             title.textContent = '新建监控任务';
             form.reset();
             this.currentEditingTask = null;
+            
+            // 默认显示端口监控字段
+            this.toggleTaskTypeFields('port');
         }
         
         modal.style.display = 'block';
@@ -325,8 +379,25 @@ class PortMonitor {
     }
 
     async saveTask() {
-        const formData = new FormData(document.getElementById('taskForm'));
-        const taskData = Object.fromEntries(formData.entries());
+        const form = document.getElementById('taskForm');
+        const formData = new FormData(form);
+        
+        const taskData = {
+            name: formData.get('name'),
+            task_type: formData.get('task_type'),
+            hostname: formData.get('hostname'),
+            interval_value: parseInt(formData.get('interval_value')),
+            interval_unit: formData.get('interval_unit')
+        };
+        
+        // 根据任务类型添加相应字段
+        if (taskData.task_type === 'port') {
+            taskData.port = parseInt(formData.get('port'));
+        } else if (taskData.task_type === 'script') {
+            taskData.username = formData.get('username');
+            taskData.password = formData.get('password');
+            taskData.script_path = formData.get('script_path');
+        }
         
         try {
             this.showLoading();
@@ -537,14 +608,37 @@ class PortMonitor {
                 const statusClass = log.status === 'success' ? 'log-success' : 'log-failed';
                 const statusIcon = log.status === 'success' ? 'fas fa-check-circle' : 'fas fa-times-circle';
                 const responseTime = log.response_time ? ` (${log.response_time}ms)` : '';
+                
+                // 根据任务类型显示不同的状态文本
+                let statusText = '';
+                if (log.script_output !== undefined && log.script_output !== null) {
+                    // 脚本执行任务
+                    statusText = log.status === 'success' ? '脚本执行成功' : '脚本执行失败';
+                } else {
+                    // 端口监控任务
+                    statusText = log.status === 'success' ? '连接成功' : '连接失败';
+                }
+                
                 const errorMsg = log.error_message ? `<br><small style="color: #e53e3e;">${log.error_message}</small>` : '';
+                
+                // 脚本输出内容
+                let scriptOutput = '';
+                if (log.script_output) {
+                    scriptOutput = `
+                        <div style="margin-top: 10px; padding: 10px; background: #f7fafc; border-radius: 4px; border-left: 3px solid #4299e1;">
+                            <div style="font-weight: 500; color: #2d3748; margin-bottom: 5px;">脚本输出:</div>
+                            <pre style="margin: 0; font-size: 12px; color: #4a5568; white-space: pre-wrap; word-break: break-all;">${log.script_output}</pre>
+                        </div>
+                    `;
+                }
                 
                 return `
                     <div class="log-item ${statusClass}">
                         <div>
                             <i class="${statusIcon}"></i>
-                            <span class="log-status">${log.status === 'success' ? '连接成功' : '连接失败'}${responseTime}</span>
+                            <span class="log-status">${statusText}${responseTime}</span>
                             ${errorMsg}
+                            ${scriptOutput}
                         </div>
                         <div class="log-time">${new Date(log.checked_at).toLocaleString('zh-CN')}</div>
                     </div>
